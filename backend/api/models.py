@@ -1,6 +1,8 @@
 from django.db import models
 import re
 from django.core.exceptions import ValidationError
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 def validate_user_id(value):
     if not re.match(r'^[a-z._]+$', value):  
@@ -46,7 +48,7 @@ class Post(models.Model):
 
 class Post_Image(models.Model):
     post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="posts_image")
-    image = models.ImageField(upload_to="images/")
+    image = models.ImageField(upload_to="images/Post_pics")
 
     def __str__(self):
         return f"Image for Post {self.post.post_id}"
@@ -55,24 +57,50 @@ class Post_Image(models.Model):
 class Hashtags(models.Model):   
     hash_id = models.AutoField(primary_key=True)
     tag = models.CharField(max_length=100 , blank=False )
+    content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type","object_id") 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.tag  
-    
-class Post_hashtags(models.Model):
-    post_id = models.ForeignKey(Post, on_delete= models.CASCADE , related_name="posts_hashtag")
-    hash_id = models.ForeignKey(Hashtags, on_delete= models.CASCADE , related_name="hashtag_id")
+
+class like(models.Model):
+    user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="likes")
+    content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type','object_id') 
+    liked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together  = ('user', 'content_type' , 'object_id' ) 
 
     def __str__(self):
-        return f"Hashtag {self.hash_id.tag} for Post {self.post_id.post_id}"
+        return f"{self.user.username} liked {self.content_object}"
     
-class likes(models.Model):
-    like_id = models.AutoField(primary_key=True)
-    liked = models.BooleanField(default=False)
-    user_id = models.ForeignKey(User, on_delete= models.CASCADE , related_name="user_like")
-    post_id = models.ForeignKey(Post, on_delete= models.CASCADE , related_name="post_liked")
+class comments(models.Model):
+    user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="users_comment")
+    content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type','object_id') 
+    commented_text = models.CharField(max_length=200 , blank=False )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    parent = models.ForeignKey('self' , blank=True , null=True ,on_delete=models.CASCADE)
+
     def __str__(self):
-        return f"Like by {self.user_id.username} on Post {self.post_id.post_id}"
+        if self.parent :
+            return f"Reply to {self.parent.id} by {self.user.username}"
+
+        return f"Commented {self.commented_text} on {self.content_object} by {self.user.username}"
+
+class saved_post(models.Model):
+    post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="saved_posts") 
+    user = models.ForeignKey(User , on_delete= models.CASCADE , related_name="saved_posts")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('post', 'user')  # Prevent duplicate saves
+
+    def __str__(self):
+        return f"{self.user.username} saved Post {self.post.post_id}"
