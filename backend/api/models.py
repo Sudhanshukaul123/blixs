@@ -14,12 +14,6 @@ def validate_password(value):
     if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', value):
         raise ValidationError("Password must be at least 8 characters long and contain both letters and numbers.")
 
-GENDER_CHOICES = [
-    ('M', 'Male'),
-    ('F', 'Female'),
-    ('P', 'Prefer not to say'),
-]
-
 # Create your models here. 
 class User(models.Model):
     user_id = models.CharField(unique=True ,max_length=15, validators=[validate_user_id] , null=False , primary_key=True)
@@ -30,10 +24,10 @@ class User(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     gender = models.CharField(
         max_length=1, 
-        choices=GENDER_CHOICES,
+        choices=[('M', 'Male'), ('F', 'Female'), ('P', 'Prefer not to say')],
         default='P' 
     )
-    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , default="profile_pics/Default_pic.png")
+    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , default="profile_pics/profile.png")
 
     def __str__(self):
         return self.username 
@@ -48,7 +42,7 @@ class Post(models.Model):
     def __str__(self):
         return f"Post by {self.user.username}"
 
-class Post_Image(models.Model):
+class PostImage(models.Model):
     post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="post_images")
     image = models.ImageField(upload_to="images/Post_pics")
 
@@ -75,7 +69,7 @@ class Like(models.Model):
     liked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together  = ('user', 'content_type' , 'object_id' )   # duplication preventer
+        unique_together  = ('user', 'content_type' , 'object_id' ) # duplication preventer
 
     def __str__(self):
         return f"{self.user.username} liked {self.content_object}"
@@ -127,3 +121,59 @@ class Story(models.Model):
 
     def __str__(self):
         return f"Story by {self.user.username}"
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+
+    message = models.CharField(max_length=255)
+
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    notification_type = models.CharField(max_length=50, choices=(
+        ('INFO', 'info'),
+        ('WARNING', 'Warning'),
+        ('ERROR', 'Error'),
+        ('SUCCESS', 'Success')
+    ), default='INFO')
+
+    def __str__(self):
+        return "Notfication for {self.user.username}: {self.message}"
+    
+    def mark_as_read(self):
+        """Mark the notification as read"""
+        self.is_read = True
+        self.save()
+
+    @property
+    def was_created_recently(self):
+        """Property to check if notification was created recently (within 24 hours)"""
+        return self.created_at >= timezone.now() - timezone.timedelta(days=1)
+
+class Message(models.Model):
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
+    subject = models.CharField(max_length=255)
+    content = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Message from {self.sender.username} to {self.recipient.username} - {self.subject}"
+
+    def mark_as_read(self):
+        """Mark the message as read"""
+        self.is_read = True
+        self.save()
+
+    def mark_as_unread(self):
+        """Mark the message as unread"""
+        self.is_read = False
+        self.save()
+
+    @property
+    def time_since_sent(self):
+        """Property to check the time passed since the message was sent"""
+        from django.utils import timezone
+        return timezone.now() - self.sent_at
