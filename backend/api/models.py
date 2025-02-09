@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 import re
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -9,20 +11,20 @@ def validate_user_id(value):
         raise ValidationError("User ID can only contain lowercase letters, dots (.), and underscores (_).")
 
 def validate_password(value):
-    if not re.search(r'\d', value):  # Search for at least one digit
-        raise ValidationError("Password must contain at least one number.")
+    if not re.match(r'^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$', value):
+        raise ValidationError("Password must be at least 8 characters long and contain both letters and numbers.")
 
 GENDER_CHOICES = [
     ('M', 'Male'),
     ('F', 'Female'),
-    ('P', 'Prefer not to say'),  # Added option
+    ('P', 'Prefer not to say'),
 ]
 
 # Create your models here. 
 class User(models.Model):
     user_id = models.CharField(unique=True ,max_length=15, validators=[validate_user_id] , null=False , primary_key=True)
     username = models.CharField(max_length=20 , blank=False )
-    password = models.CharField(min_length=8 , max_length=80 ,  validators=[validate_password] , null=False)
+    password = models.CharField(max_length=80 ,  validators=[validate_password] , null=False)
     email = models.EmailField(unique=True)
     bio = models.CharField(max_length=100 , blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -31,15 +33,15 @@ class User(models.Model):
         choices=GENDER_CHOICES,
         default='P' 
     )
-    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , default="backendz/api/Media/images/profile_pic/Default_pic.png")
+    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , default="profile_pics/Default_pic.png")
 
     def __str__(self):
-        return self.username  # Display name in admin/print
+        return self.username 
 
 
 class Post(models.Model):
     post_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User , on_delete= models.CASCADE , related_name="Post")
+    user = models.ForeignKey(User , on_delete= models.CASCADE , related_name="posts")
     caption = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -47,7 +49,7 @@ class Post(models.Model):
         return f"Post by {self.user.username}"
 
 class Post_Image(models.Model):
-    post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="posts_image")
+    post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="post_images")
     image = models.ImageField(upload_to="images/Post_pics")
 
     def __str__(self):
@@ -65,7 +67,7 @@ class Hashtags(models.Model):
     def __str__(self):
         return self.tag  
 
-class like(models.Model):
+class Like(models.Model):
     user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="likes")
     content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -73,12 +75,12 @@ class like(models.Model):
     liked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together  = ('user', 'content_type' , 'object_id' ) 
+        unique_together  = ('user', 'content_type' , 'object_id' )   # duplication preventer
 
     def __str__(self):
         return f"{self.user.username} liked {self.content_object}"
     
-class comments(models.Model):
+class Comment(models.Model):
     user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="users_comment")
     content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -94,13 +96,34 @@ class comments(models.Model):
 
         return f"Commented {self.commented_text} on {self.content_object} by {self.user.username}"
 
-class saved_post(models.Model):
+class SavedPost(models.Model):
     post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="saved_posts") 
     user = models.ForeignKey(User , on_delete= models.CASCADE , related_name="saved_posts")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('post', 'user')  # Prevent duplicate saves
+        unique_together = ('post', 'user')  # duplication preventer
 
     def __str__(self):
-        return f"{self.user.username} saved Post {self.post.post_id}"
+        return f"{self.user.username} saved Post {self.post.post_id}"   
+
+class Followers(models.Model):
+    follower =  models.ForeignKey(User , on_delete= models.CASCADE , related_name="followers")
+    following =  models.ForeignKey(User , on_delete= models.CASCADE , related_name="following")
+    followed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'following')  # duplication preventer
+
+    def __str__(self):
+        return f"{self.follower.username} following {self.following.username}"
+    
+class Story(models.Model):
+    story_id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stories")
+    image = models.ImageField(upload_to="images/story_pics/")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=timezone.now() + timedelta(hours=24))
+
+    def __str__(self):
+        return f"Story by {self.user.username}"
