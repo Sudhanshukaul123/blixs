@@ -53,9 +53,8 @@ class PostImage(models.Model):
         return f"Image for Post {self.post.post_id}"
 
 
-class Hashtags(models.Model):   
-    hash_id = models.AutoField(primary_key=True)
-    tag = models.CharField(max_length=100 , blank=False )
+class Hashtags(models.Model):
+    tag = models.CharField(max_length=100 , blank=False , primary_key=True)
     content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey("content_type","object_id") 
@@ -78,13 +77,12 @@ class Like(models.Model):
         return f"{self.user.username} liked {self.content_object}"
     
 class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="users_comment")
+    user = models.ForeignKey(User, on_delete= models.CASCADE , related_name="user_comment")
     content_type = models.ForeignKey(ContentType , on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type','object_id') 
     commented_text = models.CharField(max_length=200 , blank=False )
     created_at = models.DateTimeField(auto_now_add=True , db_index=True)
-
     parent = models.ForeignKey('self' , blank=True , null=True ,on_delete=models.CASCADE)
 
     def __str__(self):
@@ -115,13 +113,16 @@ class Followers(models.Model):
 
     def __str__(self):
         return f"{self.follower.username} following {self.following.username}"
-    
+
+def default_expiry():
+    return timezone.now() + timedelta(hours=24)
+
 class Story(models.Model):
     story_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="stories")
     image = models.ImageField(upload_to="images/story_pics/")
     created_at = models.DateTimeField(auto_now_add=True , db_index=True)
-    expires_at = models.DateTimeField(default=lambda: timezone.now() + timedelta(hours=24))
+    expires_at = models.DateTimeField(default=default_expiry)
 
     def __str__(self):
         return f"Story by {self.user.username}"
