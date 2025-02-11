@@ -1,6 +1,7 @@
-from django.shortcuts import render
-from django.http import HttpResponse
+from rest_framework import viewsets 
+from .models import User
+from .serializer.user_serialzer import UserSerializer
 
-# Create your views here.
-def home(request) :
-    return  HttpResponse("This Is The Home Page")
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
