@@ -30,7 +30,7 @@ class User(models.Model):
         choices=[('M', 'Male'), ('F', 'Female'), ('P', 'Prefer not to say')],
         default='P' 
     )
-    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , blank=True ,  default="profile_pics/profile.png")
+    profile_pic = models.ImageField(upload_to="profile_pics/" , null=True , blank=True)
 
     def __str__(self):
         return self.username 
@@ -47,7 +47,7 @@ class Post(models.Model):
 
 class PostImage(models.Model):
     post = models.ForeignKey(Post , on_delete= models.CASCADE , related_name="post_images")
-    image = models.ImageField(upload_to="images/Post_pics", default="")
+    image = models.ImageField(upload_to="images/Post_pics")
 
     def __str__(self):
         return f"Image for Post {self.post.post_id}"
